@@ -1,0 +1,58 @@
+import requests
+import json
+import time
+
+url = "https://login-stg.libris.kb.se/oauth/token"
+payload = {
+    "client_id": "xxx",           # your client ID
+    "client_secret": "xxx",   # your client secret
+    "grant_type": "client_credentials"
+}
+headers = {
+    'Content-Type': 'application/x-www-form-urlencoded'
+}
+response = requests.post(url, data=payload, headers=headers)
+response.raise_for_status()
+TOKEN = response.json().get('access_token')
+print("TOKEN:", TOKEN)
+
+baseurl = "https://libris-qa.kb.se/data"
+headers = {
+    "Authorization": f'Bearer {TOKEN}',
+    "Content-Type": "application/ld+json",
+    "XL-Active-Sigel": "SEK"
+}
+
+results = []  # keep track of line_num -> new record id
+
+with open("bib.jsonl", "r", encoding="utf-8") as f:
+    for line_num, line in enumerate(f, start=1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as e:
+            print(f"Line {line_num}: invalid JSON, skipping ({e})")
+            continue
+
+        try:
+            resp = requests.post(baseurl, headers=headers, data=json.dumps(record), timeout=30)
+        except requests.exceptions.RequestException as e:
+            print(f"Line {line_num}: request failed ({e})")
+            continue
+
+        print(f"Line {line_num}: {resp.status_code}")
+
+        if resp.status_code == 201:
+            new_id = resp.headers.get("Location")
+            print(f"  -> New record created: {new_id}")
+            results.append({"line": line_num, "id": new_id})
+        elif resp.status_code >= 400:
+            print(f"  -> {resp.text[:500]}")
+
+        time.sleep(1.5)
+
+print("\nSummary of created records:")
+for r in results:
+    print(f"Line {r['line']}: {r['id']}")
