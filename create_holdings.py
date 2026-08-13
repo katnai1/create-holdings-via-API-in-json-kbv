@@ -21,7 +21,7 @@ print("TOKEN:", TOKEN)
 URL = "https://libris-stg.kb.se/data"  # your create-record endpoint
 
 headers = {
-    "Authorization": f"{TOKEN}",
+    "Authorization": f'Bearer {TOKEN}',
     "Content-Type": "application/ld+json",
     "XL-Active-Sigel": "SEK"
 }
